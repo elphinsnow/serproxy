@@ -303,6 +303,7 @@ thr_startfunc_t serve_pipe(void *data)
 		char* welcome = "\r\n\r\nWelcome to serial proxy server\r\n\r\n";
 		char login_id[64] = { 0 };
 		char login_pass[64] = { 0 };
+		char client_opt[64] = { 0 };
 
 		/* 0 : initial */
 		/* 1 : sent server option */
@@ -378,9 +379,9 @@ thr_startfunc_t serve_pipe(void *data)
 			if (1)
 #endif
 			{
-				/* Only read input if buffer is empty */				
+				/* Only read input if buffer is empty */
 				
-				if (sio_count == 0)
+				if (sio_count == 0 && state > 6)
 				{
 					sio_count = sio_read(&pipe->sio, sio_buf, sizeof(sio_buf));
 					if (sio_count <= 0)
@@ -420,7 +421,7 @@ thr_startfunc_t serve_pipe(void *data)
 				}
 				
 				
-				/* recv client options */
+				// after recv client options
 				if (state == 2)
 				{
 					if (tcp_write(&pipe->sock, login_banner, strlen(login_banner)) < 0)
@@ -430,12 +431,13 @@ thr_startfunc_t serve_pipe(void *data)
 					}
 					state = 3;
 				}
-				/* recv user name */
+				
+				// after receive user id
 				if (state == 4)
 				{
 					char pass_banner[1024] = { 0 };
-					strcat(pass_banner, login_id);
-					strcat(pass_banner, "\nPassword: ");
+					//strcat(pass_banner, login_id);
+					strcat(pass_banner, "\r\nPassword: ");
 					if (tcp_write(&pipe->sock, pass_banner, strlen(pass_banner)) < 0)
 					{
 						perror2("server(%d) - write(sock)", port);
@@ -443,11 +445,12 @@ thr_startfunc_t serve_pipe(void *data)
 					}
 					state = 5;
 				}
-				/* recv pass */
+
+				// after receive pass
 				if (state == 6)
 				{
 					char temp[1024] = { 0 };
-					strcat(temp, login_pass);
+					//strcat(temp, login_pass);
 					strcat(temp, welcome);
 					if (tcp_write(&pipe->sock, temp, strlen(temp)) < 0)
 					{
@@ -480,6 +483,7 @@ thr_startfunc_t serve_pipe(void *data)
 					}
 					DBG_MSG3("server(%d) - read %d bytes from sock", port, sock_count);
 					
+
 					/*------------------------------------------------------*/
 					/* write telnet echo - character mode */
 					/*
@@ -497,45 +501,72 @@ thr_startfunc_t serve_pipe(void *data)
 					/*------------------------------------------------------*/
 				}
 								
-				/* sent server option */				
+				/* after sent server option */				
 				if (state == 1)
 				{
-					/* read client options */
-					memset(sock_buf, 0, sizeof(sock_buf));
-					if (tcp_read(&pipe->sock, sock_buf, sizeof(sock_buf)) <= 0)
+					/* read client options */										
+					if (tcp_read(&pipe->sock, client_opt, sizeof(client_opt)) <= 0)
 					{
 						perror2("server(%d) - read(sock)", port);
 						break;
-					}
-					memset(sock_buf, 0, sizeof(sock_buf));
-					state = 2;
-					
+					}					
+					state = 2;					
 				}
-				/* sent login banner */
+				
+				// after sent login banner
 				if (state == 3)
 				{					
-					/* read login id */
-					memset(sock_buf, 0, sizeof(sock_buf));
-					if (tcp_read(&pipe->sock, login_id, sizeof(login_id)) <= 0)
+					// read login id by character mode
+					char ch[2] = { 0 };
+					if (tcp_read(&pipe->sock, ch, 1) <= 0)
+					//if (tcp_read(&pipe->sock, login_id, sizeof(login_id)) <= 0)
 					{
 						perror2("server(%d) - read(sock)", port);
 						break;
 					}
-					
-					state = 4;
+					// write id echo 
+					if (tcp_write(&pipe->sock, ch, 1) < 0)
+					{
+						perror2("server(%d) - write(sock)", port);
+						break;
+					}
+					if (ch[0] == '\r')
+					{
+						state = 4;
+					}
+					else
+					{
+						strcat(login_id, ch);
+						state = 3;
+					}
 				}
-				/* sent pass banner */
+
+				// after sent pass banner
 				if (state == 5)
-				{					
-					/* read pass word */
-					memset(sock_buf, 0, sizeof(sock_buf));
-					if (tcp_read(&pipe->sock, login_pass, sizeof(login_pass)) <= 0)
+				{						
+					char ch[2] = { 0 };
+					// read password
+					//if (tcp_read(&pipe->sock, login_pass, sizeof(login_pass)) <= 0)
+					if (tcp_read(&pipe->sock, ch, 1) <= 0)
 					{
 						perror2("server(%d) - read(sock)", port);
 						break;
 					}
-					/* read pass */
-					state = 6;
+					// write pass echo
+					if (tcp_write(&pipe->sock, "*", 1) < 0)
+					{
+						perror2("server(%d) - write(sock)", port);
+						break;
+					}
+					if (ch[0] == '\r')
+					{
+						state = 6;
+					}
+					else
+					{
+						strcat(login_id, ch);
+						state = 5;
+					}					
 				}
 			}
 
@@ -562,7 +593,7 @@ thr_startfunc_t serve_pipe(void *data)
 			if (1)
 #endif
 			{
-				if (sock_count > 0)
+				if (sock_count > 0 && state > 6)
 				{
 					if ((res = sio_write(&pipe->sio, sock_buf, sock_count)) < 0)
 					{
