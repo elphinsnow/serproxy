@@ -482,16 +482,18 @@ thr_startfunc_t serve_pipe(void *data)
 					
 					/*------------------------------------------------------*/
 					/* write telnet echo - character mode */
+					/*
 					char ch = sock_buf[0];
 					if (ch == '\r')
 					{
 						tcp_write(&pipe->sock, "\r\n", 2);
 					}
-					/* don't echo for tab */
+					// don't echo for tab
 					if (ch != '\t')
 					{
 						tcp_write(&pipe->sock, &ch, 1);
 					}
+					*/						
 					/*------------------------------------------------------*/
 				}
 								
