@@ -4,7 +4,7 @@
  * main module for serproxy
  *
  * 1999 - Stefano Busti (original version)
- * 2021 - davidhayter (add chracter mode support)
+* 2021 - davidhayter (add character mode support)
  */
 
 
